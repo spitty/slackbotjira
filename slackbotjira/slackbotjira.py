@@ -10,6 +10,7 @@ jira = JIRA(CLEAN_JIRA_URL, basic_auth=settings.JIRA_AUTH)
 
 
 # Listen for messages that look like JIRA URLs
+@respond_to('([A-Za-z]+)-([0-9]+)')
 @listen_to('([A-Za-z]+)-([0-9]+)')
 def jira_listener(message, ticketproject, ticketnum):
   # Only attempt to find tickets in projects defined in slackbot_settings
@@ -29,19 +30,36 @@ def jira_listener(message, ticketproject, ticketnum):
   reporter = issue.fields.reporter.displayName if issue.fields.reporter else 'Anonymous'
   assignee = issue.fields.assignee.displayName if issue.fields.assignee else 'Unassigned'
   status = issue.fields.status
+  priority = issue.fields.priority
   ticket_url = CLEAN_JIRA_URL + '/browse/%s' % ticket
 
+  attachment = {"title": ticket_url
+  , "pretext": "Ticket *%s*"%(ticket)
+  , "text": summary
+  , "mrkdwn_in": ["text", "pretext"]
+  , "fields": [
+    {
+      "title": "Priority"
+      , "value": priority.name
+      , "short": True
+    }
+    ,
+    {
+      "title": "Status"
+      , "value": status.name
+      , "short": True
+    }
+    ,{
+      "title": "Reporter"
+      , "value": reporter
+      , "short": True
+    }
+    ,{
+      "title": "Assignee"
+      , "value": assignee
+      , "short": True
+    }
+  ]
+  }
   # Send message to Slack
-  message.send('''%s:
-    Summary: %s
-    Reporter: %s
-    Assignee: %s
-    Status: %s
-    ''' % (
-      ticket_url,
-      summary,
-      reporter,
-      assignee,
-      status
-    )
-  )
+  message.send_webapi('', attachments = [attachment])
